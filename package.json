@@ -1,0 +1,12 @@
+{
+  "name": "rauch-voicemail-emailer",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'No build required'"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.8",
+    "googleapis": "^118.0.0"
+  }
+}
