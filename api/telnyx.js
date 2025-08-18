@@ -69,7 +69,7 @@ export default async function handler(req, res) {
 
     console.log("Creating Outlook SMTP transporter...");
 
-    // Create transporter with Outlook SMTP
+    // Create transporter with Outlook SMTP - CORRECT METHOD NAME
     const transporter = nodemailer.createTransport({
       host: 'smtp-mail.outlook.com',
       port: 587,
@@ -78,15 +78,7 @@ export default async function handler(req, res) {
         user: process.env.OUTLOOK_EMAIL,
         pass: process.env.OUTLOOK_PASSWORD,
       },
-      tls: {
-        ciphers: 'SSLv3'
-      }
     });
-
-    // Test the connection
-    console.log("Testing SMTP connection...");
-    await transporter.verify();
-    console.log("SMTP connection successful");
 
     console.log("Sending email...");
     const info = await transporter.sendMail({
