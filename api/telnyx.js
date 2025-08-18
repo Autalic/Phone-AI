@@ -22,6 +22,8 @@ export default async function handler(req, res) {
     const transcription = payload.transcription || payload.transcript || payload.message;
     const recordingUrl = payload.recording_url || payload.media_url;
 
+    console.log("Parsed data:", { fromNumber, transcription, recordingUrl });
+
     if (!fromNumber) {
       return res.status(400).json({ error: "Missing caller number" });
     }
@@ -48,101 +50,66 @@ export default async function handler(req, res) {
 
     emailText += `---\nTelnyx Voicemail System`;
 
-    console.log("Creating email transporter...");
+    console.log("Creating test email account...");
 
-    // Use Ethereal Email (free test service) or any working SMTP
-    let transporter;
-
-    // Try multiple SMTP services
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-      // Custom SMTP (most flexible)
-      transporter = nodemailer.createTransporter({
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT || 587,
-        secure: false,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
-    } else {
-      // Create a test account using Ethereal Email for testing
-      console.log("Creating Ethereal test account...");
-      const testAccount = await nodemailer.createTestAccount();
-      
-      transporter = nodemailer.createTransporter({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-      });
-
-      console.log("Using Ethereal test account:", testAccount.user);
-      
-      // For testing, we'll also log the preview URL
-      const info = await transporter.sendMail({
-        from: `"Voicemail System" <${testAccount.user}>`,
-        to: process.env.WORK_EMAIL || 'test@example.com',
-        subject: `📞 Voicemail from ${formattedNumber}`,
-        text: emailText,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0;">📞 New Voicemail</h1>
-            </div>
-            <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
-              <p><strong>From:</strong> ${formattedNumber}</p>
-              <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
-              ${transcription ? `
-                <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                  <strong>Message:</strong><br>
-                  <em>"${transcription}"</em>
-                </div>
-              ` : '<p><em>No transcription available</em></p>'}
-              ${recordingUrl ? `
-                <p><a href="${recordingUrl}" style="background: #1a73e8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🎵 Listen to Recording</a></p>
-              ` : ''}
-            </div>
-          </div>
-        `
-      });
-
-      console.log("Email sent! Preview URL:", nodemailer.getTestMessageUrl(info));
-      
-      return res.status(200).json({ 
-        success: true, 
-        from: formattedNumber,
-        messageId: info.messageId,
-        previewUrl: nodemailer.getTestMessageUrl(info),
-        note: "Using test email service - check preview URL to see email"
-      });
-    }
-
-    console.log("Sending email...");
-    const info = await transporter.sendMail({
-      from: `"Voicemail System" <${process.env.SMTP_USER}>`,
-      to: process.env.WORK_EMAIL,
-      subject: `📞 Voicemail from ${formattedNumber}`,
-      text: emailText,
+    // Create a test account using Ethereal Email
+    const testAccount = await nodemailer.createTestAccount();
+    
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.ethereal.email',
+      port: 587,
+      secure: false,
+      auth: {
+        user: testAccount.user,
+        pass: testAccount.pass,
+      },
     });
 
-    console.log("Email sent successfully:", info.messageId);
+    console.log("Sending email via test account:", testAccount.user);
 
+    const info = await transporter.sendMail({
+      from: `"Voicemail System" <${testAccount.user}>`,
+      to: process.env.WORK_EMAIL || 'test@example.com',
+      subject: `📞 Voicemail from ${formattedNumber}`,
+      text: emailText,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0;">📞 New Voicemail</h1>
+          </div>
+          <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
+            <p><strong>From:</strong> ${formattedNumber}</p>
+            <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+            ${transcription ? `
+              <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <strong>Message:</strong><br>
+                <em>"${transcription}"</em>
+              </div>
+            ` : '<p><em>No transcription available</em></p>'}
+            ${recordingUrl ? `
+              <p><a href="${recordingUrl}" style="background: #1a73e8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🎵 Listen to Recording</a></p>
+            ` : ''}
+          </div>
+        </div>
+      `
+    });
+
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    console.log("Email sent! Preview URL:", previewUrl);
+    
     return res.status(200).json({ 
       success: true, 
       from: formattedNumber,
-      messageId: info.messageId 
+      messageId: info.messageId,
+      previewUrl: previewUrl,
+      note: "Email sent via test service - click previewUrl to see the email"
     });
 
   } catch (error) {
-    console.error("Detailed error:", error);
+    console.error("Error:", error);
     return res.status(500).json({ 
       error: "Failed to send voicemail notification",
-      details: error.message,
-      code: error.code || 'UNKNOWN'
+      details: error.message
     });
   }
 }
