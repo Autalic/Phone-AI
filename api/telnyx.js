@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     // Check if we have custom SMTP settings (like Brevo)
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
       console.log("Using custom SMTP:", process.env.SMTP_HOST);
-      transporter = nodemailer.createTransporter({
+      transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: process.env.SMTP_PORT || 587,
         secure: false,
@@ -94,7 +94,7 @@ export default async function handler(req, res) {
       // Fallback to test account
       console.log("No SMTP config found, using test account...");
       const testAccount = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransporter({
+      transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
         port: 587,
         secure: false,
