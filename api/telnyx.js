@@ -50,60 +50,116 @@ export default async function handler(req, res) {
 
     emailText += `---\nTelnyx Voicemail System`;
 
-    console.log("Creating test email account...");
+    console.log("Setting up email transporter...");
 
-    // Create a test account using Ethereal Email
-    const testAccount = await nodemailer.createTestAccount();
+    let transporter;
     
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
-    });
-
-    console.log("Sending email via test account:", testAccount.user);
-
-    const info = await transporter.sendMail({
-      from: `"Voicemail System" <${testAccount.user}>`,
-      to: process.env.WORK_EMAIL || 'test@example.com',
-      subject: `📞 Voicemail from ${formattedNumber}`,
-      text: emailText,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-            <h1 style="margin: 0;">📞 New Voicemail</h1>
+    // Check if we have custom SMTP settings (like Brevo)
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      console.log("Using custom SMTP:", process.env.SMTP_HOST);
+      transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT || 587,
+        secure: false,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+      
+      console.log("Sending email to:", process.env.WORK_EMAIL);
+      
+      const info = await transporter.sendMail({
+        from: `"Voicemail System" <${process.env.SMTP_USER}>`,
+        to: process.env.WORK_EMAIL,
+        subject: `📞 Voicemail from ${formattedNumber}`,
+        text: emailText,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0;">📞 New Voicemail</h1>
+            </div>
+            <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
+              <p><strong>From:</strong> ${formattedNumber}</p>
+              <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+              ${transcription ? `
+                <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                  <strong>Message:</strong><br>
+                  <em>"${transcription}"</em>
+                </div>
+              ` : '<p><em>No transcription available</em></p>'}
+              ${recordingUrl ? `
+                <p><a href="${recordingUrl}" style="background: #1a73e8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🎵 Listen to Recording</a></p>
+              ` : ''}
+            </div>
           </div>
-          <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
-            <p><strong>From:</strong> ${formattedNumber}</p>
-            <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
-            ${transcription ? `
-              <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                <strong>Message:</strong><br>
-                <em>"${transcription}"</em>
-              </div>
-            ` : '<p><em>No transcription available</em></p>'}
-            ${recordingUrl ? `
-              <p><a href="${recordingUrl}" style="background: #1a73e8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🎵 Listen to Recording</a></p>
-            ` : ''}
-          </div>
-        </div>
-      `
-    });
+        `
+      });
 
-    const previewUrl = nodemailer.getTestMessageUrl(info);
-    console.log("Email sent! Preview URL:", previewUrl);
-    
-    return res.status(200).json({ 
-      success: true, 
-      from: formattedNumber,
-      messageId: info.messageId,
-      previewUrl: previewUrl,
-      note: "Email sent via test service - click previewUrl to see the email"
-    });
+      console.log("Email sent successfully to work email!");
+      
+      return res.status(200).json({ 
+        success: true, 
+        from: formattedNumber,
+        messageId: info.messageId,
+        sentTo: process.env.WORK_EMAIL,
+        service: "Brevo SMTP"
+      });
+      
+    } else {
+      // Fallback to test account
+      console.log("No SMTP config found, using test account...");
+      const testAccount = await nodemailer.createTestAccount();
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+
+      console.log("Sending email via test account:", testAccount.user);
+
+      const info = await transporter.sendMail({
+        from: `"Voicemail System" <${testAccount.user}>`,
+        to: process.env.WORK_EMAIL || 'test@example.com',
+        subject: `📞 Voicemail from ${formattedNumber}`,
+        text: emailText,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0;">📞 New Voicemail</h1>
+            </div>
+            <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
+              <p><strong>From:</strong> ${formattedNumber}</p>
+              <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+              ${transcription ? `
+                <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                  <strong>Message:</strong><br>
+                  <em>"${transcription}"</em>
+                </div>
+              ` : '<p><em>No transcription available</em></p>'}
+              ${recordingUrl ? `
+                <p><a href="${recordingUrl}" style="background: #1a73e8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🎵 Listen to Recording</a></p>
+              ` : ''}
+            </div>
+          </div>
+        `
+      });
+
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      console.log("Email sent! Preview URL:", previewUrl);
+      
+      return res.status(200).json({ 
+        success: true, 
+        from: formattedNumber,
+        messageId: info.messageId,
+        previewUrl: previewUrl,
+        note: "Using test service - add SMTP config for real delivery"
+      });
+    }
 
   } catch (error) {
     console.error("Error:", error);
