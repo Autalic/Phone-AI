@@ -16,16 +16,13 @@ export default async function handler(req, res) {
 
     console.log("Telnyx webhook received:", JSON.stringify(req.body, null, 2));
 
-    // Parse payload - handle different Telnyx webhook structures
+    // Parse payload
     const payload = req.body.data?.payload || req.body.payload || req.body;
     const fromNumber = payload.from || payload.from_number || payload.caller_id_number;
     const transcription = payload.transcription || payload.transcript || payload.message;
     const recordingUrl = payload.recording_url || payload.media_url;
 
-    console.log("Parsed data:", { fromNumber, transcription, recordingUrl });
-
     if (!fromNumber) {
-      console.error("No phone number found in payload");
       return res.status(400).json({ error: "Missing caller number" });
     }
 
@@ -35,57 +32,101 @@ export default async function handler(req, res) {
       fromNumber;
 
     // Create email content
-    let message = `📞 VOICEMAIL ALERT\n\n`;
-    message += `From: ${formattedNumber}\n`;
-    message += `Time: ${new Date().toLocaleString()}\n\n`;
+    let emailText = `📞 NEW VOICEMAIL\n\n`;
+    emailText += `From: ${formattedNumber}\n`;
+    emailText += `Time: ${new Date().toLocaleString()}\n\n`;
     
     if (transcription && transcription.trim()) {
-      message += `Message: "${transcription}"\n\n`;
+      emailText += `MESSAGE:\n"${transcription}"\n\n`;
     } else {
-      message += `Message: [No transcription available]\n\n`;
+      emailText += `MESSAGE: No transcription available\n\n`;
     }
     
     if (recordingUrl) {
-      message += `🎵 Recording: ${recordingUrl}\n\n`;
+      emailText += `🎵 Listen: ${recordingUrl}\n\n`;
     }
 
-    console.log("Environment check:", {
-      hasOutlookEmail: !!process.env.OUTLOOK_EMAIL,
-      hasOutlookPassword: !!process.env.OUTLOOK_PASSWORD,
-      hasWorkEmail: !!process.env.WORK_EMAIL
-    });
+    emailText += `---\nTelnyx Voicemail System`;
 
-    // Verify environment variables
-    if (!process.env.OUTLOOK_EMAIL || !process.env.OUTLOOK_PASSWORD || !process.env.WORK_EMAIL) {
-      return res.status(500).json({ 
-        error: "Missing environment variables",
-        missing: {
-          OUTLOOK_EMAIL: !process.env.OUTLOOK_EMAIL,
-          OUTLOOK_PASSWORD: !process.env.OUTLOOK_PASSWORD,
-          WORK_EMAIL: !process.env.WORK_EMAIL
-        }
+    console.log("Creating email transporter...");
+
+    // Use Ethereal Email (free test service) or any working SMTP
+    let transporter;
+
+    // Try multiple SMTP services
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      // Custom SMTP (most flexible)
+      transporter = nodemailer.createTransporter({
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT || 587,
+        secure: false,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+    } else {
+      // Create a test account using Ethereal Email for testing
+      console.log("Creating Ethereal test account...");
+      const testAccount = await nodemailer.createTestAccount();
+      
+      transporter = nodemailer.createTransporter({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+
+      console.log("Using Ethereal test account:", testAccount.user);
+      
+      // For testing, we'll also log the preview URL
+      const info = await transporter.sendMail({
+        from: `"Voicemail System" <${testAccount.user}>`,
+        to: process.env.WORK_EMAIL || 'test@example.com',
+        subject: `📞 Voicemail from ${formattedNumber}`,
+        text: emailText,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0;">📞 New Voicemail</h1>
+            </div>
+            <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
+              <p><strong>From:</strong> ${formattedNumber}</p>
+              <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+              ${transcription ? `
+                <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                  <strong>Message:</strong><br>
+                  <em>"${transcription}"</em>
+                </div>
+              ` : '<p><em>No transcription available</em></p>'}
+              ${recordingUrl ? `
+                <p><a href="${recordingUrl}" style="background: #1a73e8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🎵 Listen to Recording</a></p>
+              ` : ''}
+            </div>
+          </div>
+        `
+      });
+
+      console.log("Email sent! Preview URL:", nodemailer.getTestMessageUrl(info));
+      
+      return res.status(200).json({ 
+        success: true, 
+        from: formattedNumber,
+        messageId: info.messageId,
+        previewUrl: nodemailer.getTestMessageUrl(info),
+        note: "Using test email service - check preview URL to see email"
       });
     }
 
-    console.log("Creating Outlook SMTP transporter...");
-
-    // Create transporter with Outlook SMTP - CORRECT METHOD NAME
-    const transporter = nodemailer.createTransport({
-      host: 'smtp-mail.outlook.com',
-      port: 587,
-      secure: false, // Use STARTTLS
-      auth: {
-        user: process.env.OUTLOOK_EMAIL,
-        pass: process.env.OUTLOOK_PASSWORD,
-      },
-    });
-
     console.log("Sending email...");
     const info = await transporter.sendMail({
-      from: process.env.OUTLOOK_EMAIL,
+      from: `"Voicemail System" <${process.env.SMTP_USER}>`,
       to: process.env.WORK_EMAIL,
       subject: `📞 Voicemail from ${formattedNumber}`,
-      text: message,
+      text: emailText,
     });
 
     console.log("Email sent successfully:", info.messageId);
@@ -97,17 +138,11 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("Detailed error:", {
-      message: error.message,
-      code: error.code,
-      command: error.command,
-      stack: error.stack
-    });
-    
+    console.error("Detailed error:", error);
     return res.status(500).json({ 
       error: "Failed to send voicemail notification",
       details: error.message,
-      code: error.code || 'UNKNOWN_ERROR'
+      code: error.code || 'UNKNOWN'
     });
   }
 }
