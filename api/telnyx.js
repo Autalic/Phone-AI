@@ -1,6 +1,6 @@
-import nodemailer from "nodemailer";
+const nodemailer = require("nodemailer");
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -45,31 +45,45 @@ export default async function handler(req, res) {
       message += `🎵 Recording: ${recordingUrl}\n\n`;
     }
 
+    console.log("Creating transporter with Outlook SMTP...");
+
     // Outlook.com SMTP (works with regular password, no app passwords needed)
     const transporter = nodemailer.createTransporter({
       host: 'smtp-mail.outlook.com',
       port: 587,
       secure: false,
       auth: {
-        user: process.env.OUTLOOK_EMAIL, // yourname@outlook.com
-        pass: process.env.OUTLOOK_PASSWORD, // regular password
+        user: process.env.OUTLOOK_EMAIL, // jimnnz@outlook.com
+        pass: process.env.OUTLOOK_PASSWORD, // your password
       },
+      tls: {
+        ciphers: 'SSLv3'
+      }
     });
 
-    await transporter.sendMail({
+    console.log("Sending email...");
+
+    const info = await transporter.sendMail({
       from: process.env.OUTLOOK_EMAIL,
-      to: process.env.WORK_EMAIL, // your Google Workspace email
+      to: process.env.WORK_EMAIL, // jim@rauch.nz
       subject: `📞 Voicemail from ${formattedNumber}`,
       text: message,
     });
 
-    return res.status(200).json({ success: true, from: formattedNumber });
+    console.log("Email sent successfully:", info.messageId);
+
+    return res.status(200).json({ 
+      success: true, 
+      from: formattedNumber,
+      messageId: info.messageId 
+    });
 
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Detailed error:", error);
     return res.status(500).json({ 
       error: "Failed to send voicemail notification",
-      details: error.message 
+      details: error.message,
+      stack: error.stack
     });
   }
-}
+};
