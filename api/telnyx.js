@@ -70,7 +70,7 @@ export default async function handler(req, res) {
     console.log("Creating Outlook SMTP transporter...");
 
     // Create transporter with Outlook SMTP
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: 'smtp-mail.outlook.com',
       port: 587,
       secure: false, // Use STARTTLS
