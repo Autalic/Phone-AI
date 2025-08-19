@@ -141,8 +141,9 @@ export default async function handler(req, res) {
       });
 
       console.log("Sending email via test account:", testAccount.user);
+      console.log("Test mode - using SMTP_USER as sender:", process.env.SMTP_USER);
       const info = await transporter.sendMail({
-        from: `"Rauch Answering Service" <${process.env.SMTP_USER}>`,
+        from: `"Rauch Answering Service" <${process.env.SMTP_USER || testAccount.user}>`,
         to: process.env.WORK_EMAIL || 'test@example.com',
         subject: `📞 Message from ${caller_name || formattedNumber}`,
         text: emailText,
