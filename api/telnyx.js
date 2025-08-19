@@ -139,7 +139,7 @@ export default async function handler(req, res) {
 
       console.log("Sending email via test account:", testAccount.user);
       const info = await transporter.sendMail({
-        from: `"Rauch Answering Service" <${testAccount.user}>`,
+        from: `"Rauch Answering Service" <${process.env.SMTP_USER}>`,
         to: process.env.WORK_EMAIL || 'test@example.com',
         subject: `📞 Message from ${caller_name || formattedNumber}`,
         text: emailText,
