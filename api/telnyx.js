@@ -43,11 +43,18 @@ export default async function handler(req, res) {
     emailText += `Time: ${call_time || new Date().toLocaleString()}`;
 
     console.log("Setting up email transporter...");
+    console.log("Environment check:");
+    console.log("- GMAIL_USER exists:", !!process.env.GMAIL_USER);
+    console.log("- GMAIL_PASS exists:", !!process.env.GMAIL_PASS);
+    console.log("- SMTP_HOST exists:", !!process.env.SMTP_HOST);
+    console.log("- SMTP_USER exists:", !!process.env.SMTP_USER);
+    console.log("- SMTP_PASS exists:", !!process.env.SMTP_PASS);
+    
     let transporter;
 
     // Check if we have Gmail SMTP settings
     if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
-      console.log("Using Gmail SMTP");
+      console.log("*** USING GMAIL SMTP PATH ***");
       transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -80,6 +87,7 @@ export default async function handler(req, res) {
 
     // Check if we have custom SMTP settings (like Brevo)
     } else if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      console.log("*** USING CUSTOM SMTP PATH ***");
       console.log("Using custom SMTP:", process.env.SMTP_HOST);
       transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
@@ -128,6 +136,7 @@ export default async function handler(req, res) {
 
     } else {
       // Fallback to test account
+      console.log("*** USING TEST ACCOUNT FALLBACK ***");
       console.log("No SMTP config found, using test account...");
       const testAccount = await nodemailer.createTestAccount();
       transporter = nodemailer.createTransport({
