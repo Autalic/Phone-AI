@@ -1,5 +1,5 @@
 const nodemailer = require("nodemailer");
-// comment
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -32,13 +32,12 @@ export default async function handler(req, res) {
         caller_phone) : 
       'Not provided';
 
-    // Create email content
-    let emailText = `📞 NEW VOICEMAIL\n\n`;
+    // Create simple email content for testing
+    let emailText = `New voicemail message\n\n`;
     emailText += `From: ${caller_name || 'Not provided'}\n`;
     emailText += `Phone: ${formattedNumber}\n`;
-    emailText += `Time: ${call_time || new Date().toLocaleString()}\n\n`;
-    emailText += `MESSAGE:\n"${message}"\n\n`;
-    emailText += `---\nRauch Architectural Designers Answering Service`;
+    emailText += `Message: ${message}\n`;
+    emailText += `Time: ${call_time || new Date().toLocaleString()}`;
 
     console.log("Setting up email transporter...");
     let transporter;
@@ -58,25 +57,13 @@ export default async function handler(req, res) {
       const info = await transporter.sendMail({
         from: `"Rauch Answering Service" <${process.env.GMAIL_USER}>`,
         to: process.env.WORK_EMAIL,
-        subject: `📞 Message from ${caller_name || formattedNumber}`,
+        subject: `New message from ${caller_name || formattedNumber}`,
         text: emailText,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0;">📞 New Message</h1>
-              <p style="margin: 5px 0 0 0;">Rauch Architectural Designers</p>
-            </div>
-            <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
-              <p><strong>From:</strong> ${caller_name || 'Not provided'}</p>
-              <p><strong>Phone:</strong> ${formattedNumber}</p>
-              <p><strong>Time:</strong> ${call_time || new Date().toLocaleString()}</p>
-              <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                <strong>Message:</strong><br>
-                <em>"${message}"</em>
-              </div>
-            </div>
-          </div>
-        `
+        html: `<p><strong>New Voicemail</strong></p>
+               <p>From: ${caller_name || 'Not provided'}<br>
+               Phone: ${formattedNumber}<br>
+               Time: ${call_time || new Date().toLocaleString()}</p>
+               <p>Message: ${message}</p>`
       });
 
       console.log("Email sent successfully via Gmail!");
