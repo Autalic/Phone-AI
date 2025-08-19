@@ -58,7 +58,7 @@ export default async function handler(req, res) {
 
       console.log("Sending email to:", process.env.WORK_EMAIL);
       const info = await transporter.sendMail({
-        from: `"Rauch Answering Service" <${process.env.SMTP_USER}>`,
+        from: `"Rauch Answering Service" <${process.env.WORK_EMAIL}>`,
         to: process.env.WORK_EMAIL,
         subject: `📞 Message from ${caller_name || formattedNumber}`,
         text: emailText,
