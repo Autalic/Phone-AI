@@ -135,8 +135,8 @@ export default async function handler(req, res) {
       });
 
     } else {
-      // Fallback to test account
-      console.log("*** USING TEST ACCOUNT FALLBACK ***");
+      // Use test account (no authentication needed)
+      console.log("*** USING TEST ACCOUNT - GENERATES PREVIEW LINKS ***");
       console.log("No SMTP config found, using test account...");
       const testAccount = await nodemailer.createTestAccount();
       transporter = nodemailer.createTransport({
