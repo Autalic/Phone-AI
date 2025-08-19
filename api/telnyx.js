@@ -43,8 +43,53 @@ export default async function handler(req, res) {
     console.log("Setting up email transporter...");
     let transporter;
 
+    // Check if we have Gmail SMTP settings
+    if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+      console.log("Using Gmail SMTP");
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.GMAIL_USER,
+          pass: process.env.GMAIL_PASS, // Use App Password, not regular password
+        },
+      });
+
+      console.log("Sending email via Gmail to:", process.env.WORK_EMAIL);
+      const info = await transporter.sendMail({
+        from: `"Rauch Answering Service" <${process.env.GMAIL_USER}>`,
+        to: process.env.WORK_EMAIL,
+        subject: `📞 Message from ${caller_name || formattedNumber}`,
+        text: emailText,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0;">📞 New Message</h1>
+              <p style="margin: 5px 0 0 0;">Rauch Architectural Designers</p>
+            </div>
+            <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
+              <p><strong>From:</strong> ${caller_name || 'Not provided'}</p>
+              <p><strong>Phone:</strong> ${formattedNumber}</p>
+              <p><strong>Time:</strong> ${call_time || new Date().toLocaleString()}</p>
+              <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <strong>Message:</strong><br>
+                <em>"${message}"</em>
+              </div>
+            </div>
+          </div>
+        `
+      });
+
+      console.log("Email sent successfully via Gmail!");
+      return res.status(200).json({
+        success: true,
+        from: formattedNumber,
+        messageId: info.messageId,
+        sentTo: process.env.WORK_EMAIL,
+        service: "Gmail SMTP"
+      });
+
     // Check if we have custom SMTP settings (like Brevo)
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    } else if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
       console.log("Using custom SMTP:", process.env.SMTP_HOST);
       transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
