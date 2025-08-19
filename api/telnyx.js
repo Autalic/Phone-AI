@@ -89,7 +89,7 @@ export default async function handler(req, res) {
       });
 
       console.log("Sending email to:", process.env.WORK_EMAIL);
-      console.log("Using sender email:", process.env.WORK_EMAIL);
+      console.log("Using sender email:", process.env.SMTP_USER);
       const info = await transporter.sendMail({
         from: `"Rauch Answering Service" <${process.env.FROM_EMAIL || process.env.WORK_EMAIL}>`,
         to: process.env.WORK_EMAIL,
