@@ -1,6 +1,5 @@
 const nodemailer = require("nodemailer");
 
-// Force rebuild - using SMTP_USER as sender
 console.log("Starting webhook handler...");
 
 export default async function handler(req, res) {
@@ -19,10 +18,28 @@ export default async function handler(req, res) {
 
     console.log("AI Assistant webhook received:", JSON.stringify(req.body, null, 2));
 
-    // For AI Assistant tool webhooks, data comes directly in req.body
-    const { caller_name, caller_phone, message, call_time, transcript } = req.body;
+    // Extract data from request body - check for multiple possible parameter names
+    const { 
+      caller_name, 
+      caller_phone, 
+      message, 
+      call_time,
+      transcript,           // Standard parameter name
+      conversation_history, // Alternative parameter name
+      full_transcript,      // Another possible parameter name
+      history               // Another possible parameter name
+    } = req.body;
 
-    console.log("Parsed data:", { caller_name, caller_phone, message, call_time, transcript });
+    // Use whichever transcript parameter is available
+    const actualTranscript = transcript || conversation_history || full_transcript || history || 'Not provided';
+    
+    console.log("Parsed data:", { 
+      caller_name, 
+      caller_phone, 
+      message, 
+      call_time,
+      transcript: actualTranscript 
+    });
 
     if (!message) {
       return res.status(400).json({ error: "Missing message" });
@@ -35,13 +52,13 @@ export default async function handler(req, res) {
         caller_phone) : 
       'Not provided';
 
-    // Create simple email content for testing
+    // Create email content
     let emailText = `New voicemail message\n\n`;
     emailText += `From: ${caller_name || 'Not provided'}\n`;
     emailText += `Phone: ${formattedNumber}\n`;
     emailText += `Message: ${message}\n`;
     emailText += `Time: ${call_time || new Date().toLocaleString()}\n`;
-    emailText += `Full Transcript:\n${transcript || 'Not provided'}`;
+    emailText += `Full Transcript:\n${actualTranscript}`;
 
     console.log("Setting up email transporter...");
     console.log("Environment check:");
@@ -60,7 +77,7 @@ export default async function handler(req, res) {
         service: 'gmail',
         auth: {
           user: process.env.GMAIL_USER,
-          pass: process.env.GMAIL_PASS, // Use App Password, not regular password
+          pass: process.env.GMAIL_PASS,
         },
       });
 
@@ -76,7 +93,7 @@ export default async function handler(req, res) {
                Time: ${call_time || new Date().toLocaleString()}</p>
                <p>Message: ${message}</p>
                <p><strong>Full Transcript:</strong><br>
-               <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto;">${transcript || 'Not provided'}</pre></p>`
+               <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto;">${actualTranscript}</pre></p>`
       });
 
       console.log("Email sent successfully via Gmail!");
@@ -125,7 +142,7 @@ export default async function handler(req, res) {
               </div>
               <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
                 <strong>Full Transcript:</strong><br>
-                <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${transcript || 'Not provided'}</pre>
+                <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${actualTranscript}</pre>
               </div>
             </div>
           </div>
@@ -179,14 +196,14 @@ export default async function handler(req, res) {
               </div>
               <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
                 <strong>Full Transcript:</strong><br>
-                <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${transcript || 'Not provided'}</pre>
+                <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${actualTranscript}</pre>
               </div>
             </div>
           </div>
         `
       });
 
-      const previewUrl = nodemailer.getTestMessageUrl(info);
+      const previewUrl = nodemailer.gettestMessageUrl(info);
       console.log("Email sent! Preview URL:", previewUrl);
       return res.status(200).json({
         success: true,
