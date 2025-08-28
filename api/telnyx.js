@@ -20,9 +20,9 @@ export default async function handler(req, res) {
     console.log("AI Assistant webhook received:", JSON.stringify(req.body, null, 2));
 
     // For AI Assistant tool webhooks, data comes directly in req.body
-    const { caller_name, caller_phone, message, call_time } = req.body;
+    const { caller_name, caller_phone, message, call_time, transcript } = req.body;
 
-    console.log("Parsed data:", { caller_name, caller_phone, message, call_time });
+    console.log("Parsed data:", { caller_name, caller_phone, message, call_time, transcript });
 
     if (!message) {
       return res.status(400).json({ error: "Missing message" });
@@ -40,7 +40,8 @@ export default async function handler(req, res) {
     emailText += `From: ${caller_name || 'Not provided'}\n`;
     emailText += `Phone: ${formattedNumber}\n`;
     emailText += `Message: ${message}\n`;
-    emailText += `Time: ${call_time || new Date().toLocaleString()}`;
+    emailText += `Time: ${call_time || new Date().toLocaleString()}\n`;
+    emailText += `Full Transcript:\n${transcript || 'Not provided'}`;
 
     console.log("Setting up email transporter...");
     console.log("Environment check:");
@@ -73,7 +74,9 @@ export default async function handler(req, res) {
                <p>From: ${caller_name || 'Not provided'}<br>
                Phone: ${formattedNumber}<br>
                Time: ${call_time || new Date().toLocaleString()}</p>
-               <p>Message: ${message}</p>`
+               <p>Message: ${message}</p>
+               <p><strong>Full Transcript:</strong><br>
+               <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto;">${transcript || 'Not provided'}</pre></p>`
       });
 
       console.log("Email sent successfully via Gmail!");
@@ -119,6 +122,10 @@ export default async function handler(req, res) {
               <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
                 <strong>Message:</strong><br>
                 <em>"${message}"</em>
+              </div>
+              <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <strong>Full Transcript:</strong><br>
+                <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${transcript || 'Not provided'}</pre>
               </div>
             </div>
           </div>
@@ -169,6 +176,10 @@ export default async function handler(req, res) {
               <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
                 <strong>Message:</strong><br>
                 <em>"${message}"</em>
+              </div>
+              <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <strong>Full Transcript:</strong><br>
+                <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${transcript || 'Not provided'}</pre>
               </div>
             </div>
           </div>
