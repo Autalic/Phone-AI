@@ -18,27 +18,32 @@ export default async function handler(req, res) {
 
     console.log("AI Assistant webhook received:", JSON.stringify(req.body, null, 2));
 
-    // Extract data from request body - check for multiple possible parameter names
+    // Extract data from request body
     const { 
       caller_name, 
       caller_phone, 
       message, 
       call_time,
-      transcript,           // Standard parameter name
-      conversation_history, // Alternative parameter name
-      full_transcript,      // Another possible parameter name
-      history               // Another possible parameter name
+      transcript
     } = req.body;
 
-    // Use whichever transcript parameter is available
-    const actualTranscript = transcript || conversation_history || full_transcript || history || 'Not provided';
+    // Create a basic transcript if not provided
+    let fullTranscript = transcript;
+    if (!transcript || transcript === 'Not provided') {
+      const currentTime = new Date().toLocaleString();
+      fullTranscript = `Call received at ${currentTime}\n`;
+      fullTranscript += `Caller: ${caller_name || 'Unknown'}\n`;
+      fullTranscript += `Phone: ${caller_phone || 'Not provided'}\n`;
+      fullTranscript += `Message: ${message}\n`;
+      fullTranscript += `(Full transcript not available from Telnyx)`;
+    }
     
     console.log("Parsed data:", { 
       caller_name, 
       caller_phone, 
       message, 
       call_time,
-      transcript: actualTranscript 
+      transcript: fullTranscript 
     });
 
     if (!message) {
@@ -58,161 +63,63 @@ export default async function handler(req, res) {
     emailText += `Phone: ${formattedNumber}\n`;
     emailText += `Message: ${message}\n`;
     emailText += `Time: ${call_time || new Date().toLocaleString()}\n`;
-    emailText += `Full Transcript:\n${actualTranscript}`;
+    emailText += `Full Transcript:\n${fullTranscript}`;
 
     console.log("Setting up email transporter...");
-    console.log("Environment check:");
-    console.log("- GMAIL_USER exists:", !!process.env.GMAIL_USER);
-    console.log("- GMAIL_PASS exists:", !!process.env.GMAIL_PASS);
-    console.log("- SMTP_HOST exists:", !!process.env.SMTP_HOST);
-    console.log("- SMTP_USER exists:", !!process.env.SMTP_USER);
-    console.log("- SMTP_PASS exists:", !!process.env.SMTP_PASS);
     
     let transporter;
 
-    // Check if we have Gmail SMTP settings
-    if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
-      console.log("*** USING GMAIL SMTP PATH ***");
-      transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.GMAIL_USER,
-          pass: process.env.GMAIL_PASS,
-        },
-      });
+    // Using custom SMTP settings (Brevo)
+    console.log("*** USING CUSTOM SMTP PATH ***");
+    console.log("Using custom SMTP:", process.env.SMTP_HOST);
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
 
-      console.log("Sending email via Gmail to:", process.env.WORK_EMAIL);
-      const info = await transporter.sendMail({
-        from: `"Rauch Answering Service" <${process.env.GMAIL_USER}>`,
-        to: process.env.WORK_EMAIL,
-        subject: `New message from ${caller_name || formattedNumber}`,
-        text: emailText,
-        html: `<p><strong>New Voicemail</strong></p>
-               <p>From: ${caller_name || 'Not provided'}<br>
-               Phone: ${formattedNumber}<br>
-               Time: ${call_time || new Date().toLocaleString()}</p>
-               <p>Message: ${message}</p>
-               <p><strong>Full Transcript:</strong><br>
-               <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto;">${actualTranscript}</pre></p>`
-      });
-
-      console.log("Email sent successfully via Gmail!");
-      return res.status(200).json({
-        success: true,
-        from: formattedNumber,
-        messageId: info.messageId,
-        sentTo: process.env.WORK_EMAIL,
-        service: "Gmail SMTP"
-      });
-
-    // Check if we have custom SMTP settings (like Brevo)
-    } else if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-      console.log("*** USING CUSTOM SMTP PATH ***");
-      console.log("Using custom SMTP:", process.env.SMTP_HOST);
-      transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT || 587,
-        secure: false,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
-
-      console.log("Sending email to:", process.env.WORK_EMAIL);
-      console.log("Using sender email:", process.env.SMTP_USER);
-      const info = await transporter.sendMail({
-        from: `"Rauch Answering Service" <${process.env.FROM_EMAIL || process.env.WORK_EMAIL}>`,
-        to: process.env.WORK_EMAIL,
-        subject: `📞 Message from ${caller_name || formattedNumber}`,
-        text: emailText,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0;">📞 New Message</h1>
-              <p style="margin: 5px 0 0 0;">Rauch Architectural Designers</p>
+    console.log("Sending email to:", process.env.WORK_EMAIL);
+    console.log("Using sender email:", process.env.SMTP_USER);
+    const info = await transporter.sendMail({
+      from: `"Rauch Answering Service" <${process.env.FROM_EMAIL || process.env.WORK_EMAIL}>`,
+      to: process.env.WORK_EMAIL,
+      subject: `📞 Message from ${caller_name || formattedNumber}`,
+      text: emailText,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0;">📞 New Message</h1>
+            <p style="margin: 5px 0 0 0;">Rauch Architectural Designers</p>
+          </div>
+          <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
+            <p><strong>From:</strong> ${caller_name || 'Not provided'}</p>
+            <p><strong>Phone:</strong> ${formattedNumber}</p>
+            <p><strong>Time:</strong> ${call_time || new Date().toLocaleString()}</p>
+            <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
+              <strong>Message:</strong><br>
+              <em>"${message}"</em>
             </div>
-            <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
-              <p><strong>From:</strong> ${caller_name || 'Not provided'}</p>
-              <p><strong>Phone:</strong> ${formattedNumber}</p>
-              <p><strong>Time:</strong> ${call_time || new Date().toLocaleString()}</p>
-              <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                <strong>Message:</strong><br>
-                <em>"${message}"</em>
-              </div>
-              <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                <strong>Full Transcript:</strong><br>
-                <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${actualTranscript}</pre>
-              </div>
+            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
+              <strong>Full Transcript:</strong><br>
+              <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${fullTranscript}</pre>
             </div>
           </div>
-        `
-      });
+        </div>
+      `
+    });
 
-      console.log("Email sent successfully to work email!");
-      return res.status(200).json({
-        success: true,
-        from: formattedNumber,
-        messageId: info.messageId,
-        sentTo: process.env.WORK_EMAIL,
-        service: "Custom SMTP"
-      });
-
-    } else {
-      // Use test account (no authentication needed)
-      console.log("*** USING TEST ACCOUNT - GENERATES PREVIEW LINKS ***");
-      console.log("No SMTP config found, using test account...");
-      const testAccount = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-      });
-
-      console.log("Sending email via test account:", testAccount.user);
-      console.log("Test mode - using SMTP_USER as sender:", process.env.SMTP_USER);
-      const info = await transporter.sendMail({
-        from: `"Rauch Answering Service" <${process.env.SMTP_USER || testAccount.user}>`,
-        to: process.env.WORK_EMAIL || 'test@example.com',
-        subject: `📞 Message from ${caller_name || formattedNumber}`,
-        text: emailText,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0;">📞 New Message</h1>
-              <p style="margin: 5px 0 0 0;">Rauch Architectural Designers</p>
-            </div>
-            <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
-              <p><strong>From:</strong> ${caller_name || 'Not provided'}</p>
-              <p><strong>Phone:</strong> ${formattedNumber}</p>
-              <p><strong>Time:</strong> ${call_time || new Date().toLocaleString()}</p>
-              <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                <strong>Message:</strong><br>
-                <em>"${message}"</em>
-              </div>
-              <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                <strong>Full Transcript:</strong><br>
-                <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${actualTranscript}</pre>
-              </div>
-            </div>
-          </div>
-        `
-      });
-
-      const previewUrl = nodemailer.gettestMessageUrl(info);
-      console.log("Email sent! Preview URL:", previewUrl);
-      return res.status(200).json({
-        success: true,
-        from: formattedNumber,
-        messageId: info.messageId,
-        previewUrl: previewUrl,
-        note: "Using test service - add SMTP config for real delivery"
-      });
-    }
+    console.log("Email sent successfully to work email!");
+    return res.status(200).json({
+      success: true,
+      from: formattedNumber,
+      messageId: info.messageId,
+      sentTo: process.env.WORK_EMAIL,
+      service: "Custom SMTP"
+    });
 
   } catch (error) {
     console.error("Error:", error);
